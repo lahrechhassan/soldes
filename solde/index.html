@@ -1,0 +1,201 @@
+<html><head><base href="." />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة العمليات المالية</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            direction: rtl;
+            text-align: right;
+        }
+        .total-box {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .modal-header .btn-close {
+            margin: -0.5rem auto -0.5rem -0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#operationModal">
+        <i class="bi bi-plus-circle"></i> عملية جديدة
+    </button>
+
+    <div class="row total-box">
+        <div class="col-md-4">
+            <h5>مجموع الخصم: <span id="totalDebit" class="text-danger">0.00 درهم</span></h5>
+        </div>
+        <div class="col-md-4">
+            <h5>مجموع الإضافة: <span id="totalCredit" class="text-success">0.00 درهم</span></h5>
+        </div>
+        <div class="col-md-4">
+            <h5>الرصيد: <span id="solde" class="text-primary">0.00 درهم</span></h5>
+        </div>
+    </div>
+
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>شراء/أداء</th>
+                <th>المبلغ</th>
+                <th>إضافة/ خصم</th>
+                <th>تعديل/ حذف</th>
+            </tr>
+        </thead>
+        <tbody id="operationsTable">
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="operationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">عملية جديدة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="operationForm">
+                    <input type="hidden" id="editId">
+                    <div class="mb-3">
+                        <label class="form-label">التاريخ</label>
+                        <input type="date" class="form-control" id="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">	شراء/أداء</label>
+                        <input type="text" class="form-control" id="article" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">المبلغ</label>
+                        <input type="number" step="0.01" class="form-control" id="montant" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">إضافة/ خصم</label>
+                        <select class="form-control" id="operation" required>
+                            <option value="debit">خصم</option>
+                            <option value="credit">إضافة</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-primary" id="saveOperation">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let operations = JSON.parse(localStorage.getItem('operations')) || [];
+const modal = new bootstrap.Modal(document.getElementById('operationModal'));
+
+function saveToLocalStorage() {
+    localStorage.setItem('operations', JSON.stringify(operations));
+}
+
+function calculateTotals() {
+    let totalDebit = 0;
+    let totalCredit = 0;
+    
+    operations.forEach(op => {
+        if (op.operation === 'debit') {
+            totalDebit += parseFloat(op.montant);
+        } else {
+            totalCredit += parseFloat(op.montant);
+        }
+    });
+
+    const solde = totalCredit - totalDebit;
+
+    document.getElementById('totalDebit').textContent = totalDebit.toFixed(2) + ' درهم';
+    document.getElementById('totalCredit').textContent = totalCredit.toFixed(2) + ' درهم';
+    document.getElementById('solde').textContent = solde.toFixed(2) + ' درهم';
+}
+
+function displayOperations() {
+    const tbody = document.getElementById('operationsTable');
+    tbody.innerHTML = '';
+    
+    operations.forEach((op, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${op.date}</td>
+            <td>${op.article}</td>
+            <td>${parseFloat(op.montant).toFixed(2)} درهم</td>
+            <td><span class="badge ${op.operation === 'debit' ? 'bg-danger' : 'bg-success'}">${op.operation === 'debit' ? 'خصم' : 'إضافة'}</span></td>
+            <td>
+                <button class="btn btn-sm btn-warning" onclick="editOperation(${index})">
+                    <i class="bi bi-pencil"></i> تعديل
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteOperation(${index})">
+                    <i class="bi bi-trash"></i> حذف
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    calculateTotals();
+}
+
+document.getElementById('saveOperation').addEventListener('click', () => {
+    const form = document.getElementById('operationForm');
+    const editId = document.getElementById('editId').value;
+    
+    const operation = {
+        date: document.getElementById('date').value,
+        article: document.getElementById('article').value,
+        montant: document.getElementById('montant').value,
+        operation: document.getElementById('operation').value
+    };
+
+    if (editId === '') {
+        operations.push(operation);
+    } else {
+        operations[parseInt(editId)] = operation;
+    }
+
+    saveToLocalStorage();
+    displayOperations();
+    modal.hide();
+    form.reset();
+});
+
+function editOperation(index) {
+    const operation = operations[index];
+    document.getElementById('editId').value = index;
+    document.getElementById('date').value = operation.date;
+    document.getElementById('article').value = operation.article;
+    document.getElementById('montant').value = operation.montant;
+    document.getElementById('operation').value = operation.operation;
+    document.getElementById('modalTitle').textContent = 'تعديل العملية';
+    modal.show();
+}
+
+function deleteOperation(index) {
+    if (confirm('هل أنت متأكد من حذف هذه العملية؟')) {
+        operations.splice(index, 1);
+        saveToLocalStorage();
+        displayOperations();
+    }
+}
+
+document.getElementById('operationModal').addEventListener('hidden.bs.modal', () => {
+    document.getElementById('operationForm').reset();
+    document.getElementById('editId').value = '';
+    document.getElementById('modalTitle').textContent = 'عملية جديدة';
+});
+
+displayOperations();
+</script>
+
+</body></html>
